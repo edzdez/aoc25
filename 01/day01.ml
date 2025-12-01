@@ -15,21 +15,22 @@ let rotation_of_string s : rotation =
 
 let int_of_rotation { dir; amt } = match dir with Left -> -amt | Right -> amt
 
+let parse_rotations input =
+  String.split_lines input
+  |> List.map ~f:(Fn.compose int_of_rotation rotation_of_string)
+
 let p1 input =
-  let rotations = String.split_lines input |> List.map ~f:rotation_of_string in
+  let rotations = parse_rotations input in
   let { cnt; _ } =
     List.fold rotations ~init:{ cnt = 0; curr = 50 }
       ~f:(fun { cnt; curr } rot ->
-        let new_ = (curr + int_of_rotation rot) mod 100 in
+        let new_ = (curr + rot) mod 100 in
         { cnt = (if new_ = 0 then cnt + 1 else cnt); curr = new_ })
   in
   cnt
 
 let p2 input =
-  let rotations =
-    String.split_lines input
-    |> List.map ~f:(Fn.compose int_of_rotation rotation_of_string)
-  in
+  let rotations = parse_rotations input in
   let { cnt; _ } =
     List.fold rotations ~init:{ cnt = 0; curr = 50 }
       ~f:(fun { cnt; curr } rot ->
@@ -46,7 +47,7 @@ let run ~part input =
   match part with
   | 1 -> p1 input
   | 2 -> p2 input
-  | _ -> failwith (sprintf "Unknow part: %d" part)
+  | _ -> failwith (sprintf "Unknown part: %d" part)
 
 let%expect_test "part 1 sample input" =
   let input = In_channel.read_all "../inputs/d1p1.sample" in
