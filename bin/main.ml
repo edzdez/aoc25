@@ -8,7 +8,10 @@ let run ~day ~part file () =
     | _ -> In_channel.read_all file
   in
   let result =
-    match day with 1 -> Day01.run ~part input | _ -> failwith "Unimplemented!"
+    match day with
+    | 1 -> Day01.run ~part input
+    | 2 -> Day02.run ~part input
+    | _ -> failwith "Unimplemented!"
   in
   printf "Day %d, part %d: %d\n" day part result
 
