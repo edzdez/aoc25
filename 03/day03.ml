@@ -2,6 +2,11 @@ open! Core
 
 type bank = int list
 
+let parse_banks input =
+  String.split_lines input
+  |> List.map ~f:(fun line ->
+      String.to_list line |> List.map ~f:Char.get_digit_exn)
+
 let get_max ~min_size bank =
   match
     List.drop (List.rev bank) min_size |> List.max_elt ~compare:Int.compare
@@ -22,20 +27,12 @@ let max_joltage ~digits bank =
   aux digits bank
 
 let p1 input =
-  let banks =
-    String.split_lines input
-    |> List.map ~f:(fun line ->
-        String.to_list line |> List.map ~f:Char.get_digit_exn)
-  in
+  let banks = parse_banks input in
   let open Int64 in
   List.fold banks ~init:0L ~f:(fun acc bank -> acc + max_joltage ~digits:2 bank)
 
 let p2 input =
-  let banks =
-    String.split_lines input
-    |> List.map ~f:(fun line ->
-        String.to_list line |> List.map ~f:Char.get_digit_exn)
-  in
+  let banks = parse_banks input in
   let open Int64 in
   List.fold banks ~init:0L ~f:(fun acc bank ->
       acc + max_joltage ~digits:12 bank)
