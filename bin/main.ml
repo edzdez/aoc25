@@ -12,6 +12,7 @@ let run ~day ~part file () =
     | 1 -> string_of_int @@ Day01.run ~part input
     | 2 -> Int64.to_string @@ Day02.run ~part input
     | 3 -> Int64.to_string @@ Day03.run ~part input
+    | 4 -> string_of_int @@ Day04.run ~part input
     | _ -> failwith "Unimplemented!"
   in
   printf "Day %d, part %d: %s\n" day part result

@@ -1,0 +1,8 @@
+(library
+ (name day04)
+ (libraries core)
+ (preprocess
+  (pps ppx_jane))
+ (inline_tests
+  (deps
+   (source_tree ../inputs))))
