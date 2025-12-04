@@ -1,47 +1,42 @@
 open! Core
 
 let parse_grid input =
-  let grid =
-    String.split_lines input
-    |> List.map ~f:(fun line ->
-        String.to_list line
-        |> List.map ~f:(fun c -> Char.(c = '@'))
-        |> List.to_array)
-    |> List.to_array
-  in
-  (grid, Array.length grid, Array.length grid.(0))
+  String.split_lines input
+  |> List.map ~f:(fun line ->
+      String.to_list line
+      |> List.map ~f:(fun c -> Char.(c = '@'))
+      |> List.to_array)
+  |> List.to_array
 
-let in_grid ~rows ~cols (x, y) = x >= 0 && x < cols && y >= 0 && y < rows
-
-let count_neighbors ~grid ~rows ~cols (x, y) =
+let count_neighbors ~grid (x, y) =
   let neighbors = ref 0 in
   for dx = -1 to 1 do
     for dy = -1 to 1 do
-      let ((nx, ny) as p) = (x + dx, y + dy) in
-      if (dx <> 0 || dy <> 0) && in_grid ~rows ~cols p && grid.(ny).(nx) then
+      let nx, ny = (x + dx, y + dy) in
+      if (dx <> 0 || dy <> 0) && try grid.(ny).(nx) with _ -> false then
         neighbors := !neighbors + 1
     done
   done;
   !neighbors
 
-let find_accessible ~grid ~rows ~cols =
+let find_accessible grid =
   let accessible = ref [] in
-  for row = 0 to rows - 1 do
-    for col = 0 to cols - 1 do
-      if grid.(row).(col) && count_neighbors ~grid ~rows ~cols (col, row) < 4
-      then accessible := (col, row) :: !accessible
+  for row = 0 to Array.length grid - 1 do
+    for col = 0 to Array.length grid.(row) - 1 do
+      if grid.(row).(col) && count_neighbors ~grid (col, row) < 4 then
+        accessible := (col, row) :: !accessible
     done
   done;
   !accessible
 
 let p1 input =
-  let grid, rows, cols = parse_grid input in
-  List.length @@ find_accessible ~grid ~rows ~cols
+  let grid = parse_grid input in
+  List.length @@ find_accessible grid
 
 let p2 input =
-  let grid, rows, cols = parse_grid input in
+  let grid = parse_grid input in
   let rec aux num =
-    let accessible = find_accessible ~grid ~rows ~cols in
+    let accessible = find_accessible grid in
     List.iter accessible ~f:(fun (col, row) -> grid.(row).(col) <- false);
     let new_ = List.length accessible in
     if new_ = 0 then num else aux (num + new_)
