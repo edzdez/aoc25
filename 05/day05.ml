@@ -9,38 +9,36 @@ let interval_of_string s =
   let l, r = String.lsplit2_exn s ~on:'-' in
   (Int64.of_string l, Int64.of_string r)
 
-let parse_db = List.map ~f:interval_of_string
-
-let p1 input =
+let parse_input input =
   let db_lines, query_lines =
     String.split_lines input
     |> List.split_while ~f:(Fn.compose not String.is_empty)
   in
-  let query_lines = List.drop query_lines 1 in
-  let db = parse_db db_lines in
+  (List.map ~f:interval_of_string db_lines, List.drop query_lines 1)
+
+let p1 input =
+  let db, queries = parse_input input in
   Int64.of_int
-  @@ List.count query_lines ~f:(fun query ->
-      let query = Int64.of_string query in
-      List.exists db ~f:(fun (a, b) -> Int64.(a <= query && query <= b)))
+  @@ List.count queries ~f:(fun query ->
+      let open Int64 in
+      let query = of_string query in
+      List.exists db ~f:(fun (a, b) -> a <= query && query <= b))
 
 let p2 input =
-  let db =
-    String.split_lines input
-    |> List.take_while ~f:(Fn.compose not String.is_empty)
-    |> parse_db
+  let events =
+    parse_input input |> fst
     |> List.concat_map ~f:(fun (l, r) -> [ Begin l; End Int64.(r + 1L) ])
     |> List.sort ~compare:(fun l r ->
         Int64.compare (extract_extent l) (extract_extent r))
   in
-  let _, _, cnt =
-    List.fold db ~init:(None, 0, 0L) ~f:(fun (start, nesting, cnt) -> function
-      | Begin l -> (Some (Option.value start ~default:l), nesting + 1, cnt)
-      | End r -> (
-          match start with
-          | None -> assert false
-          | Some start ->
-              if nesting = 1 then (None, 0, Int64.(cnt + r - start))
-              else (Some start, nesting - 1, cnt)))
+  let _, cnt =
+    List.fold events ~init:(None, 0L) ~f:(fun (start, cnt) extent ->
+        match (start, extent) with
+        | None, Begin l -> (Some (l, 1), cnt)
+        | Some (l, nest), Begin _ -> (Some (l, nest + 1), cnt)
+        | Some (l, 1), End r -> (None, Int64.(cnt + r - l))
+        | Some (l, nest), End _ -> (Some (l, nest - 1), cnt)
+        | _ -> assert false)
   in
   cnt
 
