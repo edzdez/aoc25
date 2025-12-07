@@ -1,5 +1,14 @@
 (executable
  (name main)
- (libraries core core_unix.command_unix day01 day02 day03 day04 day05 day06)
+ (libraries
+  core
+  core_unix.command_unix
+  day01
+  day02
+  day03
+  day04
+  day05
+  day06
+  day07)
  (preprocess
   (pps ppx_jane)))
