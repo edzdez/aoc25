@@ -14,45 +14,50 @@ module Point = struct
     ((x1 - x2) * (x1 - x2)) + ((y1 - y2) * (y1 - y2)) + ((z1 - z2) * (z1 - z2))
 end
 
-let get_pairs = function
-  | [] -> []
+module Graph = struct
+  type t = (Point.t, (Point.t * int) list) Hashtbl.t
+
+  let add_edge ~graph u v =
+    Hashtbl.update graph u
+      ~f:(Option.value_map ~default:[ v ] ~f:(fun acc -> v :: acc));
+    Hashtbl.update graph v
+      ~f:(Option.value_map ~default:[ u ] ~f:(fun acc -> u :: acc))
+
+  let create_graph ~edges =
+    let graph = Hashtbl.create (module Point) in
+    List.iter edges ~f:(fun (a, b, _) -> add_edge ~graph a b);
+    graph
+
+  let dfs ~graph ~seen u =
+    let result = ref [] in
+    let rec go u =
+      result := u :: !result;
+      let neighbors = Hashtbl.find_exn graph u in
+      List.iter neighbors ~f:(fun v ->
+          if not @@ Hash_set.mem seen v then begin
+            Hash_set.add seen v;
+            go v
+          end)
+    in
+    go u;
+    !result
+
+  let connected_components graph =
+    let seen = Hash_set.create (module Point) in
+    let vertices = Hashtbl.keys graph in
+    List.fold vertices ~init:[] ~f:(fun acc u ->
+        if not @@ Hash_set.mem seen u then begin
+          Hash_set.add seen u;
+          dfs ~graph ~seen u :: acc
+        end
+        else acc)
+end
+
+let rec get_pairs ?(seen = []) ?(acc = []) = function
+  | [] -> acc
   | hd :: tl ->
-      let _, pairs =
-        List.fold tl ~init:([ hd ], []) ~f:(fun (seen, acc) x ->
-            (x :: seen, acc @ List.map seen ~f:(fun y -> (y, x))))
-      in
-      pairs
-
-let add_edge ~graph u v =
-  Hashtbl.update graph u
-    ~f:(Option.value_map ~default:[ v ] ~f:(fun acc -> v :: acc));
-  Hashtbl.update graph v
-    ~f:(Option.value_map ~default:[ u ] ~f:(fun acc -> u :: acc))
-
-let create_graph ~edges =
-  let graph = Hashtbl.create (module Point) in
-  List.iter edges ~f:(fun (a, b, _) -> add_edge ~graph a b);
-  graph
-
-let rec dfs ~graph ~seen u =
-  let neighbors = Hashtbl.find_exn graph u in
-  u
-  :: List.concat_map neighbors ~f:(fun v ->
-      if Hash_set.mem seen v then []
-      else begin
-        Hash_set.add seen v;
-        dfs ~graph ~seen v
-      end)
-
-let connected_components graph =
-  let seen = Hash_set.create (module Point) in
-  let vertices = Hashtbl.keys graph in
-  List.fold vertices ~init:[] ~f:(fun acc u ->
-      if not @@ Hash_set.mem seen u then begin
-        Hash_set.add seen u;
-        dfs ~graph ~seen u :: acc
-      end
-      else acc)
+      let acc = List.fold seen ~init:acc ~f:(fun acc y -> (y, hd) :: acc) in
+      get_pairs ~seen:(hd :: seen) ~acc tl
 
 let p1 ?(num = 10) input =
   let positions = String.split_lines input |> List.map ~f:Point.of_string in
@@ -61,8 +66,8 @@ let p1 ?(num = 10) input =
     |> List.map ~f:(fun (a, b) -> (a, b, Point.dist_2 a b))
     |> List.sort ~compare:(fun (_, _, x) (_, _, y) -> Int.compare x y)
   in
-  let graph = create_graph ~edges:(List.take edges num) in
-  let components = connected_components graph in
+  let graph = Graph.create_graph ~edges:(List.take edges num) in
+  let components = Graph.connected_components graph in
   let sizes =
     List.map components ~f:List.length
     |> List.sort ~compare:(Fn.flip Int.compare)
@@ -81,8 +86,9 @@ let p2 input =
   let (x1, _, _), (x2, _, _), _ =
     List.hd_exn
     @@ List.drop_while edges ~f:(fun (u, v, _) ->
-        add_edge ~graph u v;
-        List.length (dfs ~graph ~seen:(Hash_set.of_list (module Point) [ u ]) u)
+        Graph.add_edge ~graph u v;
+        List.length
+          (Graph.dfs ~graph ~seen:(Hash_set.of_list (module Point) [ u ]) u)
         <> num_vertices)
   in
   x1 * x2
