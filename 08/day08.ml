@@ -15,7 +15,7 @@ module Point = struct
 end
 
 module Graph = struct
-  type t = (Point.t, (Point.t * int) list) Hashtbl.t
+  type ('a, 'b) t = ('a, 'b) Hashtbl.t
 
   let add_edge ~graph u v =
     Hashtbl.update graph u
@@ -23,8 +23,8 @@ module Graph = struct
     Hashtbl.update graph v
       ~f:(Option.value_map ~default:[ u ] ~f:(fun acc -> u :: acc))
 
-  let create_graph ~edges =
-    let graph = Hashtbl.create (module Point) in
+  let create ?(edges = []) m =
+    let graph = Hashtbl.create m in
     List.iter edges ~f:(fun (a, b, _) -> add_edge ~graph a b);
     graph
 
@@ -42,8 +42,8 @@ module Graph = struct
     go u;
     !result
 
-  let connected_components graph =
-    let seen = Hash_set.create (module Point) in
+  let connected_components m ~graph =
+    let seen = Hash_set.create m in
     let vertices = Hashtbl.keys graph in
     List.fold vertices ~init:[] ~f:(fun acc u ->
         if not @@ Hash_set.mem seen u then begin
@@ -66,8 +66,8 @@ let p1 ?(num = 10) input =
     |> List.map ~f:(fun (a, b) -> (a, b, Point.dist_2 a b))
     |> List.sort ~compare:(fun (_, _, x) (_, _, y) -> Int.compare x y)
   in
-  let graph = Graph.create_graph ~edges:(List.take edges num) in
-  let components = Graph.connected_components graph in
+  let graph = Graph.create (module Point) ~edges:(List.take edges num) in
+  let components = Graph.connected_components (module Point) ~graph in
   let sizes =
     List.map components ~f:List.length
     |> List.sort ~compare:(Fn.flip Int.compare)
@@ -82,7 +82,7 @@ let p2 input =
     |> List.map ~f:(fun (a, b) -> (a, b, Point.dist_2 a b))
     |> List.sort ~compare:(fun (_, _, x) (_, _, y) -> Int.compare x y)
   in
-  let graph = Hashtbl.create (module Point) in
+  let graph = Graph.create (module Point) in
   let (x1, _, _), (x2, _, _), _ =
     List.hd_exn
     @@ List.drop_while edges ~f:(fun (u, v, _) ->
