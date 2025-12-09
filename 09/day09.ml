@@ -2,7 +2,7 @@ open! Core
 
 type point = int * int
 
-let point_of_int s =
+let point_of_string s =
   match String.split_on_chars s ~on:[ ',' ] with
   | [ x; y ] -> (int_of_string x, int_of_string y)
   | _ -> failwith "invalid point"
@@ -15,9 +15,9 @@ let rec get_pairs ?(seen = []) ?(acc = []) = function
 
 let rect_size (x1, y1) (x2, y2) = abs (x1 - x2 + 1) * abs (y1 - y2 + 1)
 
-let rec compute_edges = function
+let rec get_edges = function
   | [] | [ _ ] -> []
-  | x :: (y :: _ as tl) -> (x, y) :: compute_edges tl
+  | x :: (y :: _ as tl) -> (x, y) :: get_edges tl
 
 let min_max a b = if a < b then (a, b) else (b, a)
 
@@ -33,13 +33,13 @@ let cuts_rect (x1, y1) (x2, y2) ((xe1, ye1), (xe2, ye2)) =
   else false
 
 let p1 input =
-  let points = String.split_lines input |> List.map ~f:point_of_int in
+  let points = String.split_lines input |> List.map ~f:point_of_string in
   let pairs = get_pairs points in
   List.fold pairs ~init:0 ~f:(fun best (a, b) -> Int.max best @@ rect_size a b)
 
 let p2 input =
-  let points = String.split_lines input |> List.map ~f:point_of_int in
-  let edges = compute_edges @@ points @ [ List.hd_exn points ] in
+  let points = String.split_lines input |> List.map ~f:point_of_string in
+  let edges = get_edges @@ points @ [ List.hd_exn points ] in
   let pairs = get_pairs points in
   List.fold pairs ~init:0 ~f:(fun best (a, b) ->
       if not @@ List.exists edges ~f:(cuts_rect a b) then
