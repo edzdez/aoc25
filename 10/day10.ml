@@ -135,7 +135,6 @@ let p1 input =
 
 let p2 input =
   let machines = String.split_lines input |> List.map ~f:machine_of_string in
-  (* there is an off-by-one due to some ILP precision problems... *)
   List.fold machines ~init:0 ~f:(fun acc m -> acc + min_presses_ilp m)
 
 let run ~part input =
@@ -162,4 +161,6 @@ let%expect_test "part 1" =
 let%expect_test "part 2" =
   let input = In_channel.read_all "../inputs/d10.in" in
   printf "%d" (p2 input);
+  (* NOTE: there is an off-by-one due to some ILP precision
+     problems... the answer should be 16663. *)
   [%expect {| 16662 |}]
