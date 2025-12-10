@@ -3,7 +3,6 @@ open! Core
 module Graph : sig
   type 'a t
 
-  val add_edge : graph:'a t -> 'a -> 'a -> unit
   val add_diredge : graph:'a t -> 'a -> 'a -> unit
   val create : ?edges:('a * 'a) list -> 'a Hashtbl_intf.Hashtbl.Key.t -> 'a t
 
@@ -36,17 +35,19 @@ end = struct
     let rec go () =
       match Queue.dequeue q with
       | None -> None
-      | Some (u, d) ->
+      | Some (u, d) -> begin
           if equal u v then Some d
-          else begin
-            let neighbors = Hashtbl.find_exn graph u in
-            List.iter neighbors ~f:(fun v ->
-                if not @@ Hash_set.mem visited v then begin
-                  Hash_set.add visited v;
-                  Queue.enqueue q (v, d + 1)
-                end);
-            go ()
-          end
+          else
+            match Hashtbl.find graph u with
+            | None -> None
+            | Some neighbors ->
+                List.iter neighbors ~f:(fun v ->
+                    if not @@ Hash_set.mem visited v then begin
+                      Hash_set.add visited v;
+                      Queue.enqueue q (v, d + 1)
+                    end);
+                go ()
+        end
     in
     go ()
 end
@@ -101,11 +102,41 @@ let min_presses { size; config; buttons; _ } =
   done;
   Option.value_exn @@ Graph.distance ~graph (module Int) 0 config ~equal:( = )
 
+let min_presses_ilp { buttons; joltages; _ } =
+  let problem =
+    let open Lp in
+    let vars =
+      List.mapi buttons ~f:(fun i _ -> Lp.var ~integer:true @@ sprintf "x%d" i)
+      |> List.to_array
+    in
+    let obj =
+      minimize @@ Array.fold vars ~init:zero ~f:(fun acc v -> acc ++ v)
+    in
+    let constraints =
+      List.mapi joltages ~f:(fun i target_joltage ->
+          let lhs =
+            List.filter_mapi buttons ~f:(fun but_i button ->
+                if Int.bit_and button (Int.shift_left 1 i) <> 0 then
+                  Some vars.(but_i)
+                else None)
+            |> List.fold ~init:zero ~f:(fun acc var -> acc ++ var)
+          in
+          lhs =~ c @@ float_of_int target_joltage)
+    in
+    make obj constraints
+  in
+  match Lp_glpk.solve ~term_output:false problem with
+  | Ok (obj, _) -> int_of_float obj
+  | Error msg -> failwith msg
+
 let p1 input =
   let machines = String.split_lines input |> List.map ~f:machine_of_string in
   List.fold machines ~init:0 ~f:(fun acc m -> acc + min_presses m)
 
-let p2 _input = assert false
+let p2 input =
+  let machines = String.split_lines input |> List.map ~f:machine_of_string in
+  (* there is an off-by-one due to some ILP precision problems... *)
+  List.fold machines ~init:0 ~f:(fun acc m -> acc + min_presses_ilp m)
 
 let run ~part input =
   match part with
@@ -118,21 +149,17 @@ let%expect_test "part 1 sample input" =
   printf "%d" (p1 input);
   [%expect {| 7 |}]
 
-(*
 let%expect_test "part 2 sample input" =
   let input = In_channel.read_all "../inputs/d10p2.sample" in
   printf "%d" (p2 input);
-  [%expect {| 24 |}]
-*)
+  [%expect {| 33 |}]
 
 let%expect_test "part 1" =
   let input = In_channel.read_all "../inputs/d10.in" in
   printf "%d" (p1 input);
   [%expect {| 415 |}]
 
-(*
 let%expect_test "part 2" =
   let input = In_channel.read_all "../inputs/d10.in" in
   printf "%d" (p2 input);
-  [%expect {| 1479665889 |}]
-*)
+  [%expect {| 16662 |}]

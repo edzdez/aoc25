@@ -1,6 +1,6 @@
 (library
  (name day10)
- (libraries core)
+ (libraries core lp lp-glpk)
  (preprocess
   (pps ppx_jane))
  (inline_tests
