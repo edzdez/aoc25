@@ -29,34 +29,44 @@ end = struct
     List.iter edges ~f:(fun (a, b) -> add_diredge ~graph a b);
     graph
 
-  let toposort ~graph:{ adj; nodes } m =
-    let in_deg = Hashtbl.create m in
-    let rec go ?(acc = []) = function
-      | [] -> List.rev acc
-      | u :: tl -> begin
-          match Hashtbl.find adj u with
-          | None -> go ~acc:(u :: acc) tl
-          | Some vs ->
-              tl
-              @ List.filter vs ~f:(fun v ->
-                  let new_in_deg =
-                    Hashtbl.update_and_return in_deg v ~f:(function
-                      | None -> assert false
-                      | Some c -> c - 1)
-                  in
-                  new_in_deg = 0)
-              |> go ~acc:(u :: acc)
-        end
+  let in_degrees ~graph:{ adj; nodes } m =
+    let in_deg =
+      Hash_set.to_list nodes
+      |> List.map ~f:(fun v -> (v, 0))
+      |> Hashtbl.of_alist_exn m
     in
     Hashtbl.iter adj ~f:(fun vs ->
         List.iter vs
-          ~f:(Hashtbl.update in_deg ~f:(function None -> 1 | Some e -> e + 1)));
-    Hash_set.to_list nodes
-    |> List.map ~f:(fun v ->
-        Hashtbl.update in_deg v ~f:(function None -> 0 | Some e -> e);
-        v)
-    |> List.filter ~f:(fun v -> Hashtbl.find_exn in_deg v = 0)
-    |> go
+          ~f:
+            (Hashtbl.update in_deg
+               ~f:(Option.value_map ~default:0 ~f:(fun x -> x + 1))));
+    in_deg
+
+  let toposort ~graph m =
+    let in_deg = in_degrees ~graph m in
+    let q =
+      Hashtbl.to_alist in_deg
+      |> List.filter_map ~f:(function v, 0 -> Some v | _ -> None)
+      |> Queue.of_list
+    in
+    let rec go ?(acc = []) () =
+      match Queue.dequeue q with
+      | None -> List.rev acc
+      | Some u -> begin
+          Hashtbl.find graph.adj u
+          |> Option.map ~f:(fun vs ->
+              List.filter vs ~f:(fun v ->
+                  let new_in_deg =
+                    Hashtbl.update_and_return in_deg v
+                      ~f:(Option.value_map ~default:0 ~f:(fun x -> x - 1))
+                  in
+                  new_in_deg = 0)
+              |> Queue.enqueue_all q)
+          |> ignore;
+          go ~acc:(u :: acc) ()
+        end
+    in
+    go ()
 
   let num_paths ~graph:({ adj; nodes } as graph) ~equal m v =
     let count = Hashtbl.create m in
@@ -64,14 +74,14 @@ end = struct
         Hashtbl.add_exn count ~key:w ~data:(if equal v w then 1 else 0));
     let order = List.rev @@ toposort ~graph m in
     List.iter order ~f:(fun w ->
-        match Hashtbl.find adj w with
-        | None -> ()
-        | Some vs ->
+        Hashtbl.find adj w
+        |> Option.map ~f:(fun vs ->
             let num =
               List.fold vs ~init:0 ~f:(fun acc v ->
                   acc + Hashtbl.find_exn count v)
             in
-            Hashtbl.set count ~key:w ~data:num);
+            Hashtbl.set count ~key:w ~data:num)
+        |> ignore);
     count
 end
 

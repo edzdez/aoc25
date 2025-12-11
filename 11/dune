@@ -1,6 +1,6 @@
 (library
  (name day11)
- (libraries core core_kernel.pairing_heap)
+ (libraries core)
  (preprocess
   (pps ppx_jane))
  (inline_tests
