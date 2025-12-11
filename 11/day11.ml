@@ -1,5 +1,9 @@
 open! Core
 
+module Node = struct
+  type t = string * bool * bool [@@deriving equal, compare, hash, sexp]
+end
+
 module Graph = struct
   type 'a t = { adj : ('a, 'a list) Hashtbl.t; nodes : 'a Hash_set.t }
 
@@ -28,8 +32,8 @@ module Graph = struct
     go u;
     !result
 
-  let toposort ~graph:{ adj; nodes } =
-    let in_deg : ('a, int) Hashtbl.t = Hashtbl.create (module String) in
+  let toposort ~graph:{ adj; nodes } m =
+    let in_deg : ('a, int) Hashtbl.t = Hashtbl.create m in
     let rec go ?(acc = []) = function
       | [] -> List.rev acc
       | u :: tl -> (
@@ -56,11 +60,11 @@ module Graph = struct
     |> List.filter ~f:(fun v -> Hashtbl.find_exn in_deg v = 0)
     |> go
 
-  let num_paths ~graph:({ adj; nodes } as graph) v =
-    let count = Hashtbl.create (module String) in
+  let num_paths ~graph:({ adj; nodes } as graph) ~equal m v =
+    let count = Hashtbl.create m in
     Hash_set.iter nodes ~f:(fun w ->
-        Hashtbl.add_exn count ~key:w ~data:(if String.equal v w then 1 else 0));
-    let order = List.rev @@ toposort ~graph in
+        Hashtbl.add_exn count ~key:w ~data:(if equal v w then 1 else 0));
+    let order = List.rev @@ toposort ~graph m in
     List.iter order ~f:(fun w ->
         match Hashtbl.find adj w with
         | None -> ()
@@ -85,10 +89,41 @@ let p1 input =
     String.split_lines input |> List.concat_map ~f:edge_list_of_string
   in
   let graph = Graph.create ~edges (module String) in
-  let num_paths = Graph.num_paths ~graph "out" in
+  let num_paths =
+    Graph.num_paths ~graph (module String) ~equal:String.equal "out"
+  in
   Hashtbl.find_exn num_paths "you"
 
-let p2 _input = assert false
+let p2 input =
+  let edges =
+    String.split_lines input
+    |> List.concat_map ~f:(fun line ->
+        let edges = edge_list_of_string line in
+        List.concat_map edges ~f:(fun (u, v) ->
+            match u with
+            | "dac" ->
+                [
+                  ((u, false, false), (v, true, false));
+                  ((u, false, true), (v, true, true));
+                ]
+            | "fft" ->
+                [
+                  ((u, false, false), (v, false, true));
+                  ((u, true, false), (v, true, true));
+                ]
+            | u ->
+                [
+                  ((u, false, false), (v, false, false));
+                  ((u, true, false), (v, true, false));
+                  ((u, false, true), (v, false, true));
+                  ((u, true, true), (v, true, true));
+                ]))
+  in
+  let graph = Graph.create ~edges (module Node) in
+  let num_paths =
+    Graph.num_paths ~graph (module Node) ~equal:Node.equal ("out", true, true)
+  in
+  Hashtbl.find_exn num_paths ("svr", false, false)
 
 let run ~part input =
   match part with
@@ -101,21 +136,17 @@ let%expect_test "part 1 sample input" =
   printf "%d" (p1 input);
   [%expect {| 5 |}]
 
-(*
 let%expect_test "part 2 sample input" =
   let input = In_channel.read_all "../inputs/d11p2.sample" in
   printf "%d" (p2 input);
-  [%expect {| 24 |}]
-*)
+  [%expect {| 2 |}]
 
 let%expect_test "part 1" =
   let input = In_channel.read_all "../inputs/d11.in" in
   printf "%d" (p1 input);
   [%expect {| 668 |}]
 
-(*
 let%expect_test "part 2" =
   let input = In_channel.read_all "../inputs/d11.in" in
   printf "%d" (p2 input);
-  [%expect {| 1479665889 |}]
-*)
+  [%expect {| 294310962265680 |}]
