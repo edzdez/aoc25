@@ -4,7 +4,18 @@ module Node = struct
   type t = string * bool * bool [@@deriving equal, compare, hash, sexp]
 end
 
-module Graph = struct
+module Graph : sig
+  type 'a t
+
+  val create : ?edges:('a * 'a) list -> 'a Hashtbl_intf.Hashtbl.Key.t -> 'a t
+
+  val num_paths :
+    graph:'a t ->
+    equal:('a -> 'a -> bool) ->
+    'a Hashtbl_intf.Hashtbl.Key.t ->
+    'a ->
+    ('a, int) Hashtbl.t
+end = struct
   type 'a t = { adj : ('a, 'a list) Hashtbl.t; nodes : 'a Hash_set.t }
 
   let add_diredge ~graph:{ adj; nodes } u v =
@@ -18,37 +29,24 @@ module Graph = struct
     List.iter edges ~f:(fun (a, b) -> add_diredge ~graph a b);
     graph
 
-  let _dfs ~graph ~seen u =
-    let result = ref [] in
-    let rec go u =
-      result := u :: !result;
-      let neighbors = Hashtbl.find_exn graph u in
-      List.iter neighbors ~f:(fun v ->
-          if not @@ Hash_set.mem seen v then begin
-            Hash_set.add seen v;
-            go v
-          end)
-    in
-    go u;
-    !result
-
   let toposort ~graph:{ adj; nodes } m =
-    let in_deg : ('a, int) Hashtbl.t = Hashtbl.create m in
+    let in_deg = Hashtbl.create m in
     let rec go ?(acc = []) = function
       | [] -> List.rev acc
-      | u :: tl -> (
+      | u :: tl -> begin
           match Hashtbl.find adj u with
           | None -> go ~acc:(u :: acc) tl
           | Some vs ->
-              go ~acc:(u :: acc)
-              @@ tl
+              tl
               @ List.filter vs ~f:(fun v ->
                   let new_in_deg =
                     Hashtbl.update_and_return in_deg v ~f:(function
                       | None -> assert false
                       | Some c -> c - 1)
                   in
-                  new_in_deg = 0))
+                  new_in_deg = 0)
+              |> go ~acc:(u :: acc)
+        end
     in
     Hashtbl.iter adj ~f:(fun vs ->
         List.iter vs
@@ -89,10 +87,8 @@ let p1 input =
     String.split_lines input |> List.concat_map ~f:edge_list_of_string
   in
   let graph = Graph.create ~edges (module String) in
-  let num_paths =
-    Graph.num_paths ~graph (module String) ~equal:String.equal "out"
-  in
-  Hashtbl.find_exn num_paths "you"
+  Graph.num_paths ~graph (module String) ~equal:String.equal "out"
+  |> Fn.flip Hashtbl.find_exn "you"
 
 let p2 input =
   let edges =
@@ -120,10 +116,8 @@ let p2 input =
                 ]))
   in
   let graph = Graph.create ~edges (module Node) in
-  let num_paths =
-    Graph.num_paths ~graph (module Node) ~equal:Node.equal ("out", true, true)
-  in
-  Hashtbl.find_exn num_paths ("svr", false, false)
+  Graph.num_paths ~graph (module Node) ~equal:Node.equal ("out", true, true)
+  |> Fn.flip Hashtbl.find_exn @@ ("svr", false, false)
 
 let run ~part input =
   match part with
