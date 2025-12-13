@@ -103,31 +103,37 @@ let min_presses { size; config; buttons; _ } =
   Option.value_exn @@ Graph.distance ~graph (module Int) 0 config ~equal:( = )
 
 let min_presses_ilp { buttons; joltages; _ } =
-  let problem =
-    let open Lp in
-    let vars =
-      List.mapi buttons ~f:(fun i _ -> Lp.var ~integer:true @@ sprintf "x%d" i)
-      |> List.to_array
-    in
-    let obj =
-      minimize @@ Array.fold vars ~init:zero ~f:(fun acc v -> acc ++ v)
-    in
-    let constraints =
-      List.mapi joltages ~f:(fun i target_joltage ->
-          let lhs =
-            List.filter_mapi buttons ~f:(fun but_i button ->
-                if Int.bit_and button (Int.shift_left 1 i) <> 0 then
-                  Some vars.(but_i)
-                else None)
-            |> List.fold ~init:zero ~f:(fun acc var -> acc ++ var)
-          in
-          lhs =~ c @@ float_of_int target_joltage)
-    in
-    make obj constraints
+  let open Z3 in
+  let ctx = mk_context [] in
+  let opt = Optimize.mk_opt ctx in
+  let vars =
+    Array.of_list_mapi buttons ~f:(fun i _ ->
+        Symbol.mk_int ctx i |> Arithmetic.Integer.mk_const ctx)
   in
-  match Lp_glpk.solve ~term_output:false problem with
-  | Ok (obj, _) -> int_of_float obj
-  | Error msg -> failwith msg
+  let constraints =
+    List.mapi joltages ~f:(fun i target_joltage ->
+        let lhs =
+          List.filter_mapi buttons ~f:(fun but_i button ->
+              if Int.bit_and button (Int.shift_left 1 i) <> 0 then
+                Some vars.(but_i)
+              else None)
+          |> Arithmetic.mk_add ctx
+        in
+        let rhs = Arithmetic.Integer.mk_numeral_i ctx target_joltage in
+        Boolean.mk_eq ctx lhs rhs)
+  in
+  let non_negativity =
+    Array.map vars ~f:(fun v ->
+        Arithmetic.mk_ge ctx v (Arithmetic.Integer.mk_numeral_i ctx 0))
+    |> List.of_array
+  in
+  let obj = List.of_array vars |> Arithmetic.mk_add ctx in
+  Optimize.add opt constraints;
+  Optimize.add opt non_negativity;
+  let handle = Optimize.minimize opt obj in
+  match Optimize.check opt with
+  | SATISFIABLE -> Optimize.get_upper handle |> Expr.to_string |> int_of_string
+  | _ -> failwith "infeasible"
 
 let p1 input =
   let machines = String.split_lines input |> List.map ~f:machine_of_string in
@@ -161,6 +167,4 @@ let%expect_test "part 1" =
 let%expect_test "part 2" =
   let input = In_channel.read_all "../inputs/d10.in" in
   printf "%d" (p2 input);
-  (* NOTE: there is an off-by-one due to some ILP precision
-     problems... the answer should be 16663. *)
-  [%expect {| 16662 |}]
+  [%expect {| 16663 |}]
