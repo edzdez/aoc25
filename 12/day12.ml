@@ -39,44 +39,6 @@ let parse_summary input =
   let regions = List.map lines ~f:region_of_string in
   (shapes, regions)
 
-(*
-let gen_orientations shape =
-let can_fit ~shapes { width; height; demand } =
-  let grid =
-    Array.init height ~f:(fun _ -> Array.init width ~f:(fun _ -> false))
-  in
-  let works ~shape x y =
-    List.for_all shape ~f:(fun (dx, dy) ->
-        try not @@ grid.(y + dy).(x + dx) with _ -> false)
-  in
-  let rec try_fit x y = function
-    | [] -> true
-    | (_, 0) :: rest -> try_fit 0 0 rest
-    | (shape, demand) :: rest as dmd ->
-        if x = width - 1 && y = height - 1 then false
-        else
-          let next_x, next_y =
-            if x = width - 1 then (0, y + 1) else (x + 1, y)
-          in
-          if grid.(y).(x) then try_fit next_x next_y dmd
-          else
-            gen_orientations shape
-            |> List.exists ~f:(fun shape ->
-                if works ~shape x y then begin
-                  place ~shape x y;
-                  if try_fit next_x next_y @@ ((shape, demand - 1) :: rest) then
-                    true
-                  else begin
-                    unplace ~shape x y;
-                    false
-                  end
-                end
-                else false)
-  in
-  let shape_with_demand = List.zip_exn shapes demand in
-  try_fit 0 0 shape_with_demand
-*)
-
 let p1 input =
   let shapes, regions = parse_summary input in
   List.count regions ~f:(fun { width; height; demand } ->
