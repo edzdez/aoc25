@@ -45,6 +45,14 @@ let gen_orients shape =
     [ shape; List.map shape ~f:(fun (x, y) -> (y, -x + 2)) ]
     ~f:(fun shape -> [ shape; List.map shape ~f:(fun (x, y) -> (2 - x, y)) ])
 
+let obviously_impossible ~shapes ~region:{ width; height; demand } =
+  let necessary_size =
+    List.zip_exn shapes demand
+    |> List.fold ~init:0 ~f:(fun acc (shape, need) ->
+        acc + (need * List.length shape))
+  in
+  necessary_size > width * height
+
 let try_naive_tiling ~region:{ width; height; demand } =
   let width = width / 3 in
   let height = height / 3 in
@@ -92,19 +100,18 @@ let try_brute_force_tiling ~shapes ~region:{ width; height; demand } =
 let p1 input =
   let shapes, regions = parse_summary input in
   List.count regions ~f:(fun region ->
-      try_naive_tiling ~region || try_brute_force_tiling ~shapes ~region)
+      (not @@ obviously_impossible ~shapes ~region)
+      && (try_naive_tiling ~region || try_brute_force_tiling ~shapes ~region))
 
 let run ~part input =
   match part with
   | 1 -> p1 input
   | _ -> failwith (sprintf "Unknown part: %d" part)
 
-(* NOTE: commented out since it takes like 15 minutes to run...
 let%expect_test "part 1 sample input" =
   let input = In_channel.read_all "../inputs/d12p1.sample" in
   printf "%d" (p1 input);
   [%expect {| 2 |}]
-*)
 
 let%expect_test "part 1" =
   let input = In_channel.read_all "../inputs/d12.in" in
